@@ -103,6 +103,11 @@ class PhilosopherCLI:
         if not initial_message or initial_message.lower() in ['quit', 'exit']:
             return
         
+        # Handle help command during initial setup
+        if initial_message.lower() == 'help':
+            self._show_help()
+            return self._run_conversation()  # Restart conversation after help
+        
         # Start the conversation
         try:
             self.current_state = self.forum.start_conversation(initial_message)
