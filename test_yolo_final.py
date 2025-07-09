@@ -1,0 +1,1 @@
+print("YOLO mode test - created without asking!")

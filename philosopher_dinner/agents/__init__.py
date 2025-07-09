@@ -1,0 +1,1 @@
+"""Agent implementations for the philosopher dinner forum"""
