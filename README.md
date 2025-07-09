@@ -49,6 +49,14 @@ pip install -r requirements.txt
 python your_interactive_chat.py
 ```
 
+### Run Tests
+
+```bash
+# Run the test suite to verify everything works
+cd tests
+python test_runner_simple.py
+```
+
 **Example conversation:**
 ```
 🧑 You: What is the meaning of life?
@@ -186,8 +194,8 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Run tests
-python test_basic.py
-python test_langgraph.py
+cd tests
+python test_runner_simple.py
 
 # Start developing!
 python debug_interactive.py
