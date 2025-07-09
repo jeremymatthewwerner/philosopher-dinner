@@ -120,7 +120,12 @@ class PhilosopherForum:
             return "human"
         
         # If conversation is too long, end it
-        if state["turn_count"] > 20:
+        if state["turn_count"] > 10:  # Reduced from 20 to prevent long loops
+            return "end"
+        
+        # If we just had an agent response, end the conversation for now
+        # This prevents infinite loops - each conversation is one human->agent exchange
+        if state["messages"] and state["messages"][-1]["message_type"] == MessageType.AGENT:
             return "end"
         
         # Calculate who should speak next
@@ -144,8 +149,8 @@ class PhilosopherForum:
             best_agent = max(agent_scores.keys(), key=lambda x: agent_scores[x])
             return best_agent
         
-        # If no agent wants to speak, wait for human
-        return "human"
+        # If no agent wants to speak, end conversation
+        return "end"
     
     def _wait_for_human_input(self, state: ForumState) -> ForumState:
         """
