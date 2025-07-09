@@ -1,0 +1,46 @@
+name: 🤖 Issue Monitoring Agent
+
+on:
+  schedule:
+    # Run every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  monitor-issues:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run Issue Monitoring Agent
+      run: |
+        python issue_monitoring_agent.py --once
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Commit any fixes made by the agent
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "Issue Monitoring Agent"
+        git add -A
+        if ! git diff --cached --quiet; then
+          git commit -m "🤖 Automated fix applied by Issue Monitoring Agent
+          
+          🤖 Generated with [Claude Code](https://claude.ai/code)
+          
+          Co-Authored-By: Claude <noreply@anthropic.com>"
+          git push
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

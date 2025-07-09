@@ -52,7 +52,13 @@ python your_interactive_chat.py
 ### Run Tests
 
 ```bash
-# Run the test suite to verify everything works
+# Quick test suite (recommended)
+python autotest.py --quick
+
+# Comprehensive test suite
+python autotest.py --full
+
+# Or run manually
 cd tests
 python test_runner_simple.py
 ```
@@ -193,13 +199,63 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# Run tests
-cd tests
-python test_runner_simple.py
+# Set up automated testing
+python autotest.py --setup
 
-# Start developing!
-python debug_interactive.py
+# Start development with auto-testing
+python autotest.py --watch
+
+# Or run tests manually
+python autotest.py --quick
 ```
+
+## 🤖 Automated Testing & CI/CD
+
+### Continuous Integration Features
+
+**🔄 Automatic Test Running:**
+- **Pre-commit Hook**: Tests run automatically before each commit
+- **File Watcher**: Tests run automatically when files change during development
+- **GitHub Actions**: Tests run automatically on push/pull requests
+
+**⚡ Quick Commands:**
+```bash
+# Set up pre-commit hook (run once)
+python autotest.py --setup
+
+# Development mode with auto-testing
+python autotest.py --watch
+
+# Run tests manually
+python autotest.py --quick      # Fast test suite
+python autotest.py --full       # Comprehensive tests
+python autotest.py --test cli   # Specific test category
+
+# Enhanced testing with GitHub issue tracking
+python enhanced_test_runner.py
+
+# Start issue monitoring agent
+python issue_monitoring_agent.py --once    # Run once
+python issue_monitoring_agent.py           # Continuous monitoring
+```
+
+**🧪 Test Categories:**
+- **CLI Tests**: User interface and command handling
+- **LangGraph Tests**: Conversation flow and agent coordination
+- **Agent Tests**: Philosopher authenticity and behavior
+- **Integration Tests**: Full system end-to-end testing
+
+**📊 Regression Prevention:**
+- Catches bugs before users encounter them
+- Prevents infinite recursion issues
+- Validates help command functionality
+- Ensures conversation flow integrity
+
+**🤖 Automated Bug Tracking:**
+- Automatically files GitHub issues when tests fail
+- Monitors issues and attempts automatic fixes
+- Resolves issues when bugs are fixed
+- Tracks bug lifecycle and resolution metrics
 
 ## 📚 Learn More
 

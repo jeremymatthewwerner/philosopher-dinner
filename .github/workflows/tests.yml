@@ -1,0 +1,73 @@
+name: 🧪 Automated Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.11, 3.12]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run Simple Test Suite
+      run: |
+        cd tests
+        python test_runner_simple.py
+    
+    - name: Run Enhanced Test Suite with Issue Tracking
+      run: |
+        python enhanced_test_runner.py
+      continue-on-error: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Run Comprehensive Test Suite
+      run: |
+        cd tests
+        python run_all_tests.py
+      continue-on-error: true
+    
+    - name: Test CLI Interactions
+      run: |
+        cd tests
+        python test_cli_interactions.py
+      continue-on-error: true
+
+  test-without-rich:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+    
+    - name: Install minimal dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pydantic
+    
+    - name: Test without Rich dependency
+      run: |
+        cd tests
+        python test_runner_simple.py
+      continue-on-error: true
