@@ -177,6 +177,18 @@ def test_full_conversation_flow():
     print("  ✅ Full conversation flow works")
 
 
+def test_goodbye_functionality():
+    """Test that goodbye message displays correctly"""
+    print("👋 Testing goodbye functionality...")
+    
+    cli = PhilosopherCLI()
+    
+    # Test goodbye functionality - this should work without errors
+    cli._print_goodbye()
+    
+    print("  ✅ Goodbye functionality works")
+
+
 def run_simple_tests():
     """Run all simple tests"""
     
@@ -189,7 +201,8 @@ def run_simple_tests():
         test_help_command,
         test_langgraph_integration,
         test_socrates_authenticity,
-        test_full_conversation_flow
+        test_full_conversation_flow,
+        test_goodbye_functionality
     ]
     
     passed = 0

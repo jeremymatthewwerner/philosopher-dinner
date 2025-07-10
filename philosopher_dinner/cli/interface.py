@@ -238,6 +238,9 @@ class PhilosopherCLI:
     
     def _print_goodbye(self):
         """Print goodbye message"""
+        # PRODUCTION TEST: Intentional bug to test automated system
+        raise Exception("Goodbye functionality broken - testing automated bug resolution system")
+        
         if self.console:
             goodbye = Panel(
                 "[bold]Thank you for joining the philosophical discussion![/bold]\n\n"
