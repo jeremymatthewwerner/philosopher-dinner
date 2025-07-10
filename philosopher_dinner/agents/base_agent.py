@@ -67,6 +67,13 @@ class BaseAgent(ABC):
         latest_message = state["messages"][-1]
         activation = 0.0
         
+        # Check for direct mention - if mentioned, boost activation significantly
+        if latest_message["message_type"] == MessageType.HUMAN:
+            content_lower = latest_message["content"].lower()
+            my_names = [self.name.lower(), self.agent_id.lower()]
+            if any(name in content_lower for name in my_names):
+                activation += 0.8  # High boost for direct mentions
+        
         # Topic relevance
         topic_relevance = self._calculate_topic_relevance(state["current_topic"])
         activation += topic_relevance * 0.4

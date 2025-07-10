@@ -89,7 +89,7 @@ class PhilosopherForum:
         # From human input, go to coordinator
         workflow.add_edge("human_input", "coordinator")
         
-        # Compile the graph
+        # Compile the graph with recursion limit
         self.graph = workflow.compile(checkpointer=self.memory)
     
     def _coordinate_conversation(self, state: ForumState) -> ForumState:
@@ -135,6 +135,14 @@ class PhilosopherForum:
         if state["messages"] and state["messages"][-1]["message_type"] == MessageType.AGENT:
             return "end"
         
+        # Check for direct mentions in the latest message
+        if state["messages"]:
+            latest_message = state["messages"][-1]
+            if latest_message["message_type"] == MessageType.HUMAN:
+                mentioned_agent = self._detect_direct_mention(latest_message["content"])
+                if mentioned_agent and mentioned_agent in self.agents:
+                    return mentioned_agent
+        
         # Calculate who should speak next
         agent_scores = {}
         
@@ -167,6 +175,56 @@ class PhilosopherForum:
         updated_state = state.copy()
         updated_state["waiting_for_human"] = True
         return updated_state
+    
+    def _detect_direct_mention(self, message_content: str) -> Optional[str]:
+        """
+        Detect if a specific philosopher is directly mentioned in a message.
+        Returns the agent_id if found, None otherwise.
+        """
+        content_lower = message_content.lower()
+        
+        # Map of names to agent IDs (including variations)
+        name_mappings = {
+            "socrates": "socrates",
+            "aristotle": "aristotle", 
+            "kant": "kant",
+            "immanuel kant": "kant",
+            "nietzsche": "nietzsche",
+            "friedrich nietzsche": "nietzsche",
+            "confucius": "confucius",
+            "plato": "plato"
+        }
+        
+        # Check for direct mentions with various patterns
+        mention_patterns = [
+            # Direct address patterns
+            "{name} what say you",
+            "{name} what do you think",
+            "hey {name}",
+            "{name}!",
+            "{name},",
+            "{name}?",
+            # Question patterns
+            "what would {name} say",
+            "how would {name} respond",
+            "{name}'s view",
+            "ask {name}"
+        ]
+        
+        for name, agent_id in name_mappings.items():
+            # Check if the philosopher's name appears in the message
+            if name in content_lower:
+                # Check for direct mention patterns
+                for pattern in mention_patterns:
+                    formatted_pattern = pattern.format(name=name)
+                    if formatted_pattern in content_lower:
+                        return agent_id
+                
+                # Also check if the name appears at the beginning (direct address)
+                if content_lower.startswith(name) or content_lower.startswith(f"hey {name}"):
+                    return agent_id
+        
+        return None
     
     def _extract_topic(self, message_content: str) -> str:
         """
@@ -254,7 +312,10 @@ class PhilosopherForum:
         # Run one step to get initial agent responses
         result = self.graph.invoke(
             initial_state,
-            config={"configurable": {"thread_id": initial_state["session_id"]}}
+            config={
+                "configurable": {"thread_id": initial_state["session_id"]},
+                "recursion_limit": 5  # Limit recursion to prevent infinite loops
+            }
         )
         
         return result
@@ -267,7 +328,10 @@ class PhilosopherForum:
         # Continue the conversation
         result = self.graph.invoke(
             state,
-            config={"configurable": {"thread_id": state["session_id"]}}
+            config={
+                "configurable": {"thread_id": state["session_id"]},
+                "recursion_limit": 5  # Limit recursion to prevent infinite loops
+            }
         )
         
         return result

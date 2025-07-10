@@ -69,13 +69,13 @@ class PhilosopherCLI:
         else:
             print("\nForum Setup")
         
-        # For now, create a simple default forum
+        # Create a multi-agent forum with diverse philosophical perspectives
         forum_config = ForumConfig(
             forum_id="default_forum",
-            name="Ancient Wisdom Forum",
-            description="A place for philosophical discourse with ancient thinkers",
+            name="Multi-Agent Philosophy Forum",
+            description="A place for philosophical discourse with diverse thinkers across time periods",
             mode=ForumMode.EXPLORATION,
-            participants=["socrates"],  # Start with just Socrates
+            participants=["socrates", "aristotle", "kant", "nietzsche", "confucius"],  # Multi-agent conversation
             created_at=datetime.now(),
             settings={}
         )
