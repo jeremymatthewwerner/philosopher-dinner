@@ -1,0 +1,136 @@
+name: 🚨 Test Failure Handler
+
+on:
+  workflow_run:
+    workflows: ["🧪 Automated Tests"]
+    types:
+      - completed
+
+permissions:
+  contents: write
+  issues: write
+  actions: read
+  checks: read
+
+jobs:
+  handle-test-failures:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Download test artifacts
+      uses: actions/github-script@v6
+      with:
+        script: |
+          let allArtifacts = await github.rest.actions.listWorkflowRunArtifacts({
+             owner: context.repo.owner,
+             repo: context.repo.repo,
+             run_id: ${{ github.event.workflow_run.id }},
+          });
+          let matchArtifact = allArtifacts.data.artifacts.filter((artifact) => {
+            return artifact.name == "test-results"
+          })[0];
+          if (matchArtifact) {
+            let download = await github.rest.actions.downloadArtifact({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               artifact_id: matchArtifact.id,
+               archive_format: 'zip',
+            });
+            let fs = require('fs');
+            fs.writeFileSync('${{github.workspace}}/test-results.zip', Buffer.from(download.data));
+            
+            // Unzip the artifact
+            await exec.exec('unzip', ['test-results.zip']);
+          }
+    
+    - name: Analyze test failures
+      id: analyze
+      run: |
+        echo "🔍 Analyzing test failures from workflow run #${{ github.event.workflow_run.id }}"
+        
+        # Check for bug tracking database
+        if [ -f "bug_tracking.json" ]; then
+          echo "📊 Found bug tracking data"
+          cat bug_tracking.json
+          echo "has_bugs=true" >> $GITHUB_OUTPUT
+        else
+          echo "has_bugs=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Run Issue Monitoring Agent
+      if: steps.analyze.outputs.has_bugs == 'true'
+      run: |
+        echo "🤖 Immediately running issue monitoring agent for test failures"
+        python issue_monitoring_agent.py --once
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "Test Failure Handler"
+    
+    - name: Commit any fixes
+      run: |
+        if ! git diff --quiet; then
+          git add -A
+          git commit -m "🚨 Emergency fix for test failures
+
+Automated fix applied immediately after test failure detection.
+Triggered by workflow run #${{ github.event.workflow_run.id }}
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+          git push
+          echo "✅ Emergency fixes pushed"
+        fi
+
+  create-fix-pr:
+    needs: handle-test-failures
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.head_branch != 'main' }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Create Pull Request with fixes
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: "🤖 Automated fix for test failures"
+        title: "🚨 [AUTO] Fix test failures from ${{ github.event.workflow_run.head_branch }}"
+        body: |
+          ## 🤖 Automated Test Failure Fix
+          
+          This PR contains automated fixes for test failures detected in workflow run #${{ github.event.workflow_run.id }}.
+          
+          ### 📊 Details
+          - **Triggered by**: Test failures on branch `${{ github.event.workflow_run.head_branch }}`
+          - **Workflow**: ${{ github.event.workflow_run.name }}
+          - **Status**: Automated fixes applied
+          
+          ### 🔍 Review Checklist
+          - [ ] Verify the automated fixes are correct
+          - [ ] Check that all tests now pass
+          - [ ] Review any GitHub issues created/resolved
+          
+          ---
+          *This PR was automatically created by the Test Failure Handler*
+        branch: auto-fix-${{ github.event.workflow_run.id }}
+        delete-branch: true

@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -32,11 +36,24 @@ jobs:
         python test_runner_simple.py
     
     - name: Run Enhanced Test Suite with Issue Tracking
+      id: enhanced-tests
       run: |
-        python enhanced_test_runner.py
+        python enhanced_test_runner.py 2>&1 | tee test-output.log
+        echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
       continue-on-error: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Upload test artifacts
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results
+        path: |
+          test-output.log
+          bug_tracking.json
+          agent_actions.json
+          local_bug_database.json
     
     - name: Run Comprehensive Test Suite
       run: |
