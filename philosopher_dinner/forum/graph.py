@@ -1,8 +1,9 @@
 """
 LangGraph orchestrator for the philosopher dinner forum.
 Manages the flow of conversation between agents and humans.
+Enhanced with multi-forum support and dynamic agent loading.
 """
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 import uuid
 
@@ -10,21 +11,26 @@ from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 
 from .state import ForumState, ForumConfig, ForumMode, Message, MessageType
+from .database import ForumDatabase, ParticipantEvent
 from ..agents.base_agent import BaseAgent
 from ..agents.socrates import SocratesAgent
+from ..agents.agent_factory import AgentFactory
 
 
 class PhilosopherForum:
     """
     Main orchestrator for philosopher conversations using LangGraph.
     Manages multiple agents and coordinates their interactions.
+    Enhanced with multi-forum support and dynamic agent loading.
     """
     
-    def __init__(self, forum_config: ForumConfig):
+    def __init__(self, forum_config: ForumConfig, database: Optional[ForumDatabase] = None):
         self.forum_config = forum_config
         self.agents: Dict[str, BaseAgent] = {}
         self.graph = None
         self.memory = MemorySaver()
+        self.database = database or ForumDatabase()
+        self.agent_factory = AgentFactory()
         
         # Initialize agents based on forum participants
         self._initialize_agents()
@@ -33,19 +39,20 @@ class PhilosopherForum:
         self._build_graph()
     
     def _initialize_agents(self):
-        """Initialize agent instances based on forum configuration"""
+        """Initialize agent instances based on forum configuration using AgentFactory"""
         
-        # For now, we'll manually create agents
-        # Later this can be driven by configuration
+        # Create all agents dynamically using the factory
+        for participant_id in self.forum_config["participants"]:
+            if participant_id != "oracle":  # Skip oracle for now
+                agent = self.agent_factory.create_agent(participant_id)
+                if agent:
+                    self.agents[participant_id] = agent
+                else:
+                    print(f"Warning: Could not create agent for '{participant_id}'")
         
-        if "socrates" in self.forum_config["participants"]:
+        # Always ensure we have at least Socrates
+        if "socrates" not in self.agents and "socrates" in self.forum_config["participants"]:
             self.agents["socrates"] = SocratesAgent()
-        
-        # TODO: Add more agents as we implement them
-        # if "aristotle" in self.forum_config["participants"]:
-        #     self.agents["aristotle"] = AristotleAgent()
-        # if "oracle" in self.forum_config["participants"]:
-        #     self.agents["oracle"] = OracleAgent()
     
     def _build_graph(self):
         """Build the LangGraph workflow"""
@@ -264,3 +271,75 @@ class PhilosopherForum:
         )
         
         return result
+    
+    def add_participant_join_message(self, state: ForumState, participant: str) -> ForumState:
+        """Add a system message when a participant joins the forum"""
+        updated_state = state.copy()
+        
+        join_message = Message(
+            id=str(uuid.uuid4()),
+            sender="system",
+            content=f"📍 {participant.replace('_', ' ').title()} has joined the conversation",
+            message_type=MessageType.SYSTEM,
+            timestamp=datetime.now(),
+            thinking=None,
+            metadata={"event_type": "participant_join", "participant": participant}
+        )
+        
+        updated_state["messages"].append(join_message)
+        
+        # Add to database if available
+        if self.database:
+            self.database.add_message(self.forum_config["forum_id"], join_message)
+        
+        return updated_state
+    
+    def add_participant_leave_message(self, state: ForumState, participant: str) -> ForumState:
+        """Add a system message when a participant leaves the forum"""
+        updated_state = state.copy()
+        
+        leave_message = Message(
+            id=str(uuid.uuid4()),
+            sender="system",
+            content=f"👋 {participant.replace('_', ' ').title()} has left the conversation",
+            message_type=MessageType.SYSTEM,
+            timestamp=datetime.now(),
+            thinking=None,
+            metadata={"event_type": "participant_leave", "participant": participant}
+        )
+        
+        updated_state["messages"].append(leave_message)
+        
+        # Add to database if available
+        if self.database:
+            self.database.add_message(self.forum_config["forum_id"], leave_message)
+        
+        return updated_state
+    
+    def get_forum_history(self, limit: int = None, offset: int = 0) -> List[Message]:
+        """Get forum conversation history from database"""
+        if self.database:
+            return self.database.get_messages(self.forum_config["forum_id"], limit, offset)
+        return []
+    
+    def get_participant_events(self) -> List[ParticipantEvent]:
+        """Get participant join/leave events for this forum"""
+        if self.database:
+            return self.database.get_participant_events(self.forum_config["forum_id"])
+        return []
+    
+    def save_forum_summary(self, summary: str, summary_type: str = "brief") -> bool:
+        """Save a generated summary for this forum"""
+        if self.database:
+            return self.database.save_forum_summary(
+                self.forum_config["forum_id"], 
+                summary_type, 
+                summary
+            )
+        return False
+    
+    def get_forum_summary(self, summary_type: str = "brief") -> Optional[str]:
+        """Get a saved summary for this forum"""
+        if self.database:
+            return self.database.get_forum_summary(self.forum_config["forum_id"], summary_type)
+        return None

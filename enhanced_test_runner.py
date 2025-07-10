@@ -17,7 +17,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '.'))
 from github_issue_manager import GitHubIssueManager
 from tests.test_runner_simple import (
     test_help_command, test_langgraph_integration, 
-    test_socrates_authenticity, test_full_conversation_flow
+    test_socrates_authenticity, test_full_conversation_flow,
+    test_goodbye_functionality
 )
 
 class EnhancedTestRunner:
@@ -84,7 +85,8 @@ class EnhancedTestRunner:
             (test_help_command, "test_help_command"),
             (test_langgraph_integration, "test_langgraph_integration"),
             (test_socrates_authenticity, "test_socrates_authenticity"),
-            (test_full_conversation_flow, "test_full_conversation_flow")
+            (test_full_conversation_flow, "test_full_conversation_flow"),
+            (test_goodbye_functionality, "test_goodbye_functionality")
         ]
         
         results = {

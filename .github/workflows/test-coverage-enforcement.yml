@@ -1,0 +1,274 @@
+name: 🧪 Test Coverage Enforcement
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  enforce-test-coverage:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for better analysis
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest coverage
+    
+    - name: Analyze new functionality
+      id: analyze
+      run: |
+        echo "🔍 Analyzing new functionality for test coverage..."
+        
+        # Run coverage analysis
+        python test_coverage_enforcer.py > coverage_report.txt 2>&1
+        
+        # Check if coverage is acceptable
+        if python test_coverage_enforcer.py --enforce; then
+          echo "coverage_acceptable=true" >> $GITHUB_OUTPUT
+        else
+          echo "coverage_acceptable=false" >> $GITHUB_OUTPUT
+        fi
+        
+        # Get coverage statistics
+        COVERAGE_PERCENT=$(python test_coverage_enforcer.py | grep "OVERALL COVERAGE" | grep -o "[0-9]*\.[0-9]*" | head -1)
+        echo "coverage_percent=${COVERAGE_PERCENT:-0}" >> $GITHUB_OUTPUT
+    
+    - name: Generate comprehensive test templates
+      if: steps.analyze.outputs.coverage_acceptable == 'false'
+      run: |
+        echo "📝 Generating comprehensive test templates..."
+        
+        # Generate test templates
+        python test_coverage_enforcer.py --generate-templates
+        
+        # Generate intelligent tests
+        python intelligent_test_generator.py --auto-generate
+        
+        # Count generated tests
+        if [ -d "tests/generated" ]; then
+          GENERATED_COUNT=$(find tests/generated -name "*.py" | wc -l)
+          echo "Generated $GENERATED_COUNT test files"
+        fi
+    
+    - name: Run existing tests to establish baseline
+      run: |
+        echo "🧪 Running existing tests..."
+        
+        # Run enhanced test suite
+        python enhanced_test_runner.py > test_results.txt 2>&1 || true
+        
+        # Run simple test suite
+        cd tests && python test_runner_simple.py >> ../test_results.txt 2>&1 || true
+    
+    - name: Create detailed coverage report
+      id: report
+      run: |
+        echo "📊 Creating detailed coverage report..."
+        
+        # Create comprehensive report
+        cat > coverage_summary.md << 'EOF'
+        # 🧪 Test Coverage Analysis Report
+        
+        **Coverage Status:** ${{ steps.analyze.outputs.coverage_acceptable == 'true' && '✅ ACCEPTABLE' || '❌ NEEDS IMPROVEMENT' }}
+        **Overall Coverage:** ${{ steps.analyze.outputs.coverage_percent }}%
+        **Analysis Date:** $(date)
+        
+        ## 📋 Functionality Analysis
+        
+        EOF
+        
+        # Add analysis details
+        python test_coverage_enforcer.py >> coverage_summary.md
+        
+        # Add test results
+        echo -e "\n## 🧪 Test Execution Results\n" >> coverage_summary.md
+        echo '```' >> coverage_summary.md
+        cat test_results.txt >> coverage_summary.md
+        echo '```' >> coverage_summary.md
+        
+        # Check if we need to generate tests
+        if [ "${{ steps.analyze.outputs.coverage_acceptable }}" == "false" ]; then
+          echo "needs_tests=true" >> $GITHUB_OUTPUT
+        else
+          echo "needs_tests=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Commit generated tests
+      if: steps.report.outputs.needs_tests == 'true'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "Test Coverage Enforcer"
+        
+        # Add generated tests
+        git add tests/generated/ || true
+        git add test_coverage_tracking.json || true
+        
+        if ! git diff --cached --quiet; then
+          git commit -m "🤖 Auto-generate comprehensive test coverage
+
+Generated tests for new functionality to ensure comprehensive coverage.
+
+📊 Coverage Analysis:
+- Overall coverage: ${{ steps.analyze.outputs.coverage_percent }}%
+- Status: Needs improvement
+- Generated templates for missing test coverage
+
+📝 Next Steps:
+1. Review generated test templates in tests/generated/
+2. Implement TODO items in test templates
+3. Run tests to verify functionality
+4. Add tests to regular test suite
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+        fi
+    
+    - name: Push generated tests
+      if: steps.report.outputs.needs_tests == 'true' && github.event_name == 'push'
+      run: |
+        git push || echo "Nothing to push"
+    
+    - name: Create Pull Request for test improvements
+      if: steps.report.outputs.needs_tests == 'true' && github.event_name == 'pull_request'
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: "🤖 Improve test coverage with auto-generated tests"
+        title: "🧪 [AUTO] Comprehensive Test Coverage Improvement"
+        body: |
+          ## 🤖 Automated Test Coverage Improvement
+          
+          This PR adds comprehensive test coverage for new functionality.
+          
+          ### 📊 Coverage Analysis
+          - **Current Coverage:** ${{ steps.analyze.outputs.coverage_percent }}%
+          - **Status:** ${{ steps.analyze.outputs.coverage_acceptable == 'true' && 'Acceptable' || 'Needs Improvement' }}
+          
+          ### 🧪 Generated Tests Include:
+          - ✅ Happy path testing
+          - ✅ Error handling scenarios  
+          - ✅ Edge case validation
+          - ✅ Integration testing
+          - ✅ Performance considerations
+          - ✅ Security validation
+          
+          ### 📝 Implementation Required
+          The generated tests contain TODO items that need implementation:
+          1. Review each test template
+          2. Implement specific test logic
+          3. Add appropriate assertions
+          4. Verify test data and mocks
+          
+          ### 🔍 Files Modified
+          - Added comprehensive test templates in `tests/generated/`
+          - Updated test coverage tracking database
+          
+          ---
+          *This PR was automatically created by the Test Coverage Enforcement workflow*
+        branch: auto-test-coverage-${{ github.run_number }}
+        delete-branch: true
+    
+    - name: Comment on PR with coverage report
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const coverageReport = fs.readFileSync('coverage_summary.md', 'utf8');
+          const coverageAcceptable = '${{ steps.analyze.outputs.coverage_acceptable }}' === 'true';
+          
+          const comment = `## 🧪 Test Coverage Analysis
+          
+          ${coverageReport}
+          
+          ${!coverageAcceptable ? `
+          ### ⚠️ Action Required
+          
+          **Test coverage needs improvement!** 
+          
+          I've generated comprehensive test templates to help improve coverage. Please:
+          
+          1. 📝 Review generated tests in \`tests/generated/\`
+          2. 🛠️ Implement the TODO items in test templates
+          3. 🧪 Run tests to verify they work correctly
+          4. ✅ Ensure all new functionality has proper test coverage
+          
+          **Generated test types:**
+          - Happy path scenarios
+          - Error handling
+          - Edge cases
+          - Integration tests
+          - Performance validation
+          - Security checks
+          ` : `
+          ### ✅ Test Coverage Acceptable
+          
+          Great job! The test coverage meets our requirements.
+          `}
+          
+          ---
+          *Generated by Test Coverage Enforcement workflow*`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+    
+    - name: Upload coverage artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-analysis
+        path: |
+          coverage_report.txt
+          coverage_summary.md
+          test_results.txt
+          test_coverage_tracking.json
+          tests/generated/
+    
+    - name: Set status check
+      if: always()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const coverageAcceptable = '${{ steps.analyze.outputs.coverage_acceptable }}' === 'true';
+          const conclusion = coverageAcceptable ? 'success' : 'failure';
+          const title = coverageAcceptable ? 'Test coverage acceptable' : 'Test coverage needs improvement';
+          
+          github.rest.checks.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            name: 'Test Coverage Enforcement',
+            head_sha: context.sha,
+            status: 'completed',
+            conclusion: conclusion,
+            output: {
+              title: title,
+              summary: `Overall coverage: ${{ steps.analyze.outputs.coverage_percent }}%`
+            }
+          });
+          
+          // Fail the job if coverage is not acceptable (this will block merging)
+          if (!coverageAcceptable) {
+            core.setFailed('Test coverage requirements not met. Please add comprehensive tests for new functionality.');
+          }
