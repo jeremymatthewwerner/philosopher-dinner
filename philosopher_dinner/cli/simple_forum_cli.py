@@ -192,10 +192,55 @@ and use semantic search to discover philosophical conversations.
         if self.db.create_forum(metadata):
             self._display_success_message(f"✅ Forum created successfully! ID: {forum_id}")
             
+            # Test agent creation (show spinning indicator)
+            if metadata.participants:
+                self._display_message("🤖 Creating philosopher agents...")
+                self._test_agent_creation(metadata.participants)
+            
             if self._confirm("Would you like to join this forum now?"):
                 self._join_forum_by_id(forum_id)
         else:
             self._display_error_message("❌ Failed to create forum")
+    
+    def _test_agent_creation(self, participants: List[str]):
+        """Test that agents can be created for the forum participants"""
+        from ..agents.agent_factory import AgentFactory
+        
+        factory = AgentFactory()
+        created_agents = []
+        
+        for participant_id in participants:
+            if participant_id != "oracle":  # Skip oracle for now
+                try:
+                    if self.console:
+                        self.console.print(f"  🧠 Creating {participant_id.replace('_', ' ').title()}...")
+                    else:
+                        print(f"  Creating {participant_id}...")
+                    
+                    agent = factory.create_agent(participant_id)
+                    if agent:
+                        created_agents.append(agent.name)
+                    else:
+                        if self.console:
+                            self.console.print(f"  ⚠️ Could not create agent for {participant_id}")
+                        else:
+                            print(f"  Warning: Could not create {participant_id}")
+                except Exception as e:
+                    if self.console:
+                        self.console.print(f"  ❌ Error creating {participant_id}: {e}")
+                    else:
+                        print(f"  Error creating {participant_id}: {e}")
+        
+        if created_agents:
+            if self.console:
+                self.console.print(f"✅ Successfully created agents: {', '.join(created_agents)}")
+            else:
+                print(f"Successfully created: {', '.join(created_agents)}")
+        else:
+            if self.console:
+                self.console.print("⚠️ No agents could be created. Forum will work but without AI responses.")
+            else:
+                print("Warning: No agents created.")
     
     def _handle_list_forums(self, args: List[str]):
         """Handle list forums command"""

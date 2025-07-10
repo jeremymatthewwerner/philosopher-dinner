@@ -194,6 +194,7 @@ What philosophical question keeps you up at night?"""
         Continue the forum creation dialog.
         Returns (response, is_complete)
         """
+        
         if self.creation_state == "gathering_topic":
             return self._process_topic_input(user_input)
         elif self.creation_state == "suggesting_thinkers":
@@ -246,11 +247,30 @@ What sounds interesting to you?"""
     
     def _process_thinker_selection(self, user_input: str) -> Tuple[str, bool]:
         """Process user's thinker selection choices"""
-        user_lower = user_input.lower()
+        user_lower = user_input.lower().strip()
         
-        if any(phrase in user_lower for phrase in ["looks good", "accept", "yes", "perfect", "great"]):
+        # Handle numbered selections (1, 2, 3, 4)
+        if user_input.strip().isdigit():
+            choice = int(user_input.strip())
+            if choice == 1:
+                # Accept suggestions
+                selected_thinkers = [self._convert_name_to_id(s.name) for s in self.suggested_thinkers[:4]]
+                self.forum_draft["participants"].extend(selected_thinkers)
+                return self._finalize_forum()
+            elif choice == 2:
+                return "Which specific philosophers would you like? (e.g., 'I want Kant and Nietzsche')", False
+            elif choice == 3:
+                suggestions = self._generate_alternative_suggestions()
+                return self._present_alternative_suggestions(suggestions), False
+            elif choice == 4:
+                return "Which thinker would you like to know more about?", False
+            else:
+                return "Please choose 1, 2, 3, or 4 from the options above.", False
+        
+        # Handle text-based responses
+        elif any(phrase in user_lower for phrase in ["looks good", "accept", "yes", "perfect", "great"]):
             # User accepts suggestions
-            selected_thinkers = [s.name.lower().replace(" ", "_") for s in self.suggested_thinkers[:4]]
+            selected_thinkers = [self._convert_name_to_id(s.name) for s in self.suggested_thinkers[:4]]
             self.forum_draft["participants"].extend(selected_thinkers)
             return self._finalize_forum()
             
@@ -270,10 +290,12 @@ What sounds interesting to you?"""
         else:
             return """I'm not sure what you'd like to do. You can:
 
-- Say **"looks good"** to accept my suggestions
-- Say **"I want [philosopher name]"** to request specific thinkers  
-- Say **"show me others"** for different suggestions
-- Ask about any specific thinker for more details
+**1** - Accept these suggestions
+**2** - Request specific thinkers  
+**3** - Show me different suggestions
+**4** - Get more details about a thinker
+
+You can type the number (1, 2, 3, 4) or say things like "looks good" or "I want Kant".
 
 What would you prefer?""", False
     
@@ -350,19 +372,25 @@ The thinkers are gathering and preparing their thoughts. You can now join the fo
             
             # Check expertise areas
             for expertise in info["expertise"]:
-                if any(keyword in topic_lower for keyword in expertise.split("_")):
-                    score += 0.4
-                    why_relevant.append(f"expert in {expertise}")
+                expertise_keywords = expertise.split("_")
+                for keyword in expertise_keywords:
+                    if keyword in topic_lower:
+                        score += 0.4
+                        why_relevant.append(f"expert in {expertise}")
+                        break
             
-            # Check key ideas
+            # Check key ideas (only match significant words, not single letters)
             for idea in info["key_ideas"]:
-                if any(keyword in topic_lower for keyword in idea.lower().split()):
-                    score += 0.3
-                    why_relevant.append(f"developed ideas about {idea}")
+                idea_keywords = [word for word in idea.lower().split() if len(word) > 2]  # Skip words like "a", "is", "of"
+                for keyword in idea_keywords:
+                    if keyword in topic_lower:
+                        score += 0.3
+                        why_relevant.append(f"developed ideas about {idea}")
+                        break
             
             # Topic-specific bonuses
             if "justice" in topic_lower or "society" in topic_lower:
-                if thinker_id in ["plato", "aristotle", "locke"]:
+                if thinker_id in ["socrates", "plato", "aristotle", "locke"]:
                     score += 0.5
                     why_relevant.append("fundamental work on justice and society")
             
@@ -371,23 +399,167 @@ The thinkers are gathering and preparing their thoughts. You can now join the fo
                     score += 0.5
                     why_relevant.append("pioneered thinking about mind and consciousness")
             
-            if "ethics" in topic_lower or "moral" in topic_lower:
-                if thinker_id in ["kant", "aristotle", "confucius"]:
+            if any(term in topic_lower for term in ["ethics", "moral", "justice", "virtue", "good", "live", "should", "ought"]):
+                if thinker_id in ["kant", "aristotle", "confucius", "socrates"]:
                     score += 0.5
                     why_relevant.append("created foundational ethical frameworks")
             
+            if any(term in topic_lower for term in ["meaning", "purpose", "life", "existence", "happiness", "live"]):
+                if thinker_id in ["aristotle", "confucius", "buddha", "nietzsche", "socrates"]:
+                    score += 0.5
+                    why_relevant.append("explored life's meaning and human flourishing")
+            
             if score > 0.3:
-                suggestions.append(ThinkerSuggestion(
+                suggestion = ThinkerSuggestion(
                     name=info["name"],
                     era=info["era"],
                     expertise=info["expertise"],
                     why_relevant="; ".join(why_relevant[:2]),
                     confidence=min(1.0, score)
-                ))
+                )
+                suggestions.append(suggestion)
         
         # Sort by relevance score
         suggestions.sort(key=lambda x: x.confidence, reverse=True)
         return suggestions[:8]  # Return top 8
+    
+    def _convert_name_to_id(self, name: str) -> str:
+        """Convert a philosopher's full name to their agent ID"""
+        name_to_id = {
+            "Socrates": "socrates",
+            "Aristotle": "aristotle", 
+            "Plato": "plato",
+            "Immanuel Kant": "kant",
+            "Friedrich Nietzsche": "nietzsche",
+            "René Descartes": "descartes",
+            "David Hume": "hume",
+            "John Locke": "locke",
+            "Confucius": "confucius",
+            "Siddhartha Gautama (Buddha)": "buddha"
+        }
+        return name_to_id.get(name, name.lower().replace(" ", "_"))
+    
+    def _generate_alternative_suggestions(self) -> List[ThinkerSuggestion]:
+        """Generate alternative thinker suggestions"""
+        # Get current topic for context
+        topic = self.forum_draft.get("topic", "")
+        
+        # Generate new suggestions by rotating through different categories
+        all_suggestions = self._generate_thinker_suggestions(topic)
+        
+        # Skip suggestions we already showed
+        shown_names = {s.name for s in self.suggested_thinkers}
+        alternative_suggestions = [s for s in all_suggestions if s.name not in shown_names]
+        
+        # If we don't have enough alternatives, add some general philosophers
+        if len(alternative_suggestions) < 4:
+            general_thinkers = ["Confucius", "Buddha", "John Locke", "David Hume"]
+            for thinker_name in general_thinkers:
+                if thinker_name not in shown_names:
+                    thinker_id = self._convert_name_to_id(thinker_name).replace("_", "")
+                    if thinker_id in self.available_thinkers:
+                        info = self.available_thinkers[thinker_id]
+                        suggestion = ThinkerSuggestion(
+                            name=info["name"],
+                            era=info["era"],
+                            expertise=info["expertise"],
+                            why_relevant="Offers a different cultural/philosophical perspective",
+                            confidence=0.6
+                        )
+                        alternative_suggestions.append(suggestion)
+        
+        return alternative_suggestions[:5]
+    
+    def _present_alternative_suggestions(self, suggestions: List[ThinkerSuggestion]) -> str:
+        """Present alternative thinker suggestions"""
+        if not suggestions:
+            return "I'm running out of good suggestions! Why don't you tell me specific philosophers you'd like to include?"
+        
+        response = "Here are some alternative thinker suggestions:\n\n"
+        
+        for i, suggestion in enumerate(suggestions[:5], 1):
+            response += f"""**{i}. {suggestion.name}** ({suggestion.era})
+   🎯 *Relevant because*: {suggestion.why_relevant}
+   📚 *Expertise*: {', '.join(suggestion.expertise)}
+   
+"""
+        
+        response += """**What would you like to do?**
+
+**1** - Accept these alternative suggestions
+**2** - Mix and match (tell me which specific ones you want)
+**3** - Go back to original suggestions
+**4** - Tell me exactly which philosophers you want
+
+Type the number or describe what you'd prefer!"""
+        
+        # Update suggested thinkers for potential selection
+        self.suggested_thinkers = suggestions
+        
+        return response
+    
+    def _process_specific_requests(self, user_input: str) -> Tuple[str, bool]:
+        """Process specific thinker requests"""
+        requested_thinkers = []
+        found_names = []
+        
+        # Look for philosopher names in the input
+        for thinker_id, info in self.available_thinkers.items():
+            name = info["name"].lower()
+            if name in user_input.lower() or thinker_id in user_input.lower():
+                requested_thinkers.append(thinker_id)
+                found_names.append(info["name"])
+        
+        if not requested_thinkers:
+            return """I didn't recognize any philosopher names in your request. 
+
+Available philosophers include: Socrates, Aristotle, Plato, Kant, Nietzsche, Descartes, Hume, Locke, Confucius, Buddha.
+
+Try saying something like "I want Kant and Aristotle" or "Add Socrates to the discussion".""", False
+        
+        if len(requested_thinkers) > 5:
+            return f"""That's a lot of thinkers! I found: {', '.join(found_names)}.
+
+For the best discussion, I recommend 3-4 philosophers. Which ones are most important for your topic?""", False
+        
+        # Add the requested thinkers
+        self.forum_draft["participants"].extend(requested_thinkers)
+        
+        # Check if we have enough
+        if len(requested_thinkers) < 2:
+            return f"""Great choice! I've added {', '.join(found_names)} to your forum.
+
+Would you like to add 1-2 more thinkers for a richer discussion? You can:
+- Say "add [philosopher name]" 
+- Say "that's enough" to finalize with just {', '.join(found_names)}
+- Say "suggest more" for my recommendations""", False
+        else:
+            return self._finalize_forum()
+    
+    def _provide_thinker_details(self, user_input: str) -> str:
+        """Provide details about a specific thinker"""
+        # Find which thinker they're asking about
+        for suggestion in self.suggested_thinkers:
+            if suggestion.name.lower() in user_input.lower():
+                thinker_id = self._convert_name_to_id(suggestion.name).replace("_", "")
+                if thinker_id in self.available_thinkers:
+                    info = self.available_thinkers[thinker_id]
+                    
+                    details = f"""**{info['name']}** ({info['era']})
+
+**Philosophy**: {info['style']}
+
+**Key Ideas**: {', '.join(info['key_ideas'])}
+
+**Famous Quote**: "{info['quotes'][0] if info['quotes'] else 'Wisdom speaks through action.'}"
+
+**Why relevant for your topic**: {suggestion.why_relevant}
+
+Would you like to include {info['name']} in your forum? You can say "yes add them" or ask about another thinker."""
+                    
+                    return details
+        
+        return "I'm not sure which thinker you're asking about. Could you be more specific?"
     
     def _suggest_forum_mode(self, topic: str) -> ForumMode:
         """Suggest appropriate forum mode based on topic"""
