@@ -11,6 +11,7 @@ from datetime import datetime
 # Add project to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+from test_dependencies import main as run_dependency_tests
 from test_cli_interactions import run_cli_tests
 from test_langgraph_flows import run_langgraph_tests 
 from test_agent_behavior import run_agent_tests
@@ -224,6 +225,15 @@ def main():
     
     # Run all test suites
     all_results = []
+    
+    # FIRST: Check dependencies (must pass before running other tests)
+    print("\n" + "=" * 60)
+    dep_result = run_dependency_tests()
+    if dep_result != 0:
+        print("\n❌ CRITICAL: Dependency check failed!")
+        print("   Cannot run other tests until dependencies are fixed.")
+        return 1
+    print("=" * 60 + "\n")
     
     # Component tests
     all_results.append(run_cli_tests())
