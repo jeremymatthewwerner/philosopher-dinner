@@ -148,15 +148,30 @@ The test should pass without errors.
         if not bug_to_resolve:
             return False
         
+        # Get current commit for linking
+        try:
+            import subprocess
+            result = subprocess.run(['git', 'rev-parse', 'HEAD'], 
+                                  capture_output=True, text=True)
+            current_commit = result.stdout.strip()
+            short_commit = current_commit[:8] if result.returncode == 0 else "unknown"
+        except:
+            current_commit = "unknown"
+            short_commit = "unknown"
+        
         # Close the GitHub issue
         close_message = f"""## 🎉 Bug Resolved
         
 **Test:** `{test_name}`
 **Resolved:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 **Bug ID:** `{bug_id}`
+**Resolution Commit:** `{short_commit}`
 
 ### Resolution
 The test `{test_name}` is now passing. The bug has been automatically resolved.
+
+### Related Commits
+This issue was resolved around commit [`{short_commit}`](https://github.com/{self.get_repo_info()}/commit/{current_commit}).
 
 ### Verification
 Run the test suite to verify the fix:
@@ -222,6 +237,30 @@ python3 autotest.py --quick
     def list_resolved_bugs(self) -> List[Dict]:
         """List all resolved bugs"""
         return list(self.bug_db["resolved_bugs"].values())
+    
+    def get_repo_info(self):
+        """Get repository owner/name for URL construction"""
+        try:
+            import subprocess
+            result = subprocess.run([
+                'git', 'remote', 'get-url', 'origin'
+            ], capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                url = result.stdout.strip()
+                # Extract owner/repo from various URL formats
+                if 'github.com' in url:
+                    if url.startswith('git@'):
+                        # SSH format: git@github.com:owner/repo.git
+                        parts = url.split(':')[1].replace('.git', '')
+                    else:
+                        # HTTPS format: https://github.com/owner/repo.git
+                        parts = url.split('github.com/')[-1].replace('.git', '')
+                    return parts
+            
+            return "unknown/unknown"
+        except:
+            return "unknown/unknown"
 
 
 def main():

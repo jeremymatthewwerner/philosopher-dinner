@@ -305,17 +305,30 @@ class IssueMonitoringAgent:
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         if fix_success:
+            # Get the current git commit hash for linking
+            try:
+                import subprocess
+                result = subprocess.run(['git', 'rev-parse', 'HEAD'], 
+                                      capture_output=True, text=True, cwd=self.repo_path)
+                current_commit = result.stdout.strip()[:8] if result.returncode == 0 else "unknown"
+            except:
+                current_commit = "unknown"
+            
             comment = f"""## 🤖 Automated Fix Attempt - SUCCESS
             
 **Timestamp:** {timestamp}
 **Agent:** Issue Monitoring Agent
 **Status:** ✅ Fix Applied Successfully
+**Commit:** {current_commit}
 
 ### Fix Details
 {fix_details}
 
 ### Verification
 The automated tests are now passing. The issue should be resolved.
+
+### Related Commit
+This fix will be included in the next commit. The commit hash will be: `{current_commit}`
 
 ### Next Steps
 - Tests will continue to monitor for regressions
