@@ -42,11 +42,35 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+### 🤖 Enable AI-Powered Philosophers (Recommended)
+
+For authentic AI-powered philosophical conversations, configure an LLM provider:
+
+```bash
+# Run the setup script
+python setup_llm.py
+
+# Edit .env file with your API key (choose one):
+# For OpenAI: Set OPENAI_API_KEY=your_key_here
+# For Anthropic: Set ANTHROPIC_API_KEY=your_key_here
+
+# Install LLM dependencies
+pip install langchain-openai      # For OpenAI
+# OR
+pip install langchain-anthropic   # For Anthropic
+```
+
+**Without LLM setup**: The system uses pre-written responses (limited but functional)  
+**With LLM setup**: Philosophers generate authentic, dynamic responses using AI 🎯
+
 ### Start Your First Philosophical Conversation
 
 ```bash
-# Have a personal chat with Socrates
-python your_interactive_chat.py
+# Multi-forum interface (recommended)
+python main.py
+
+# Or classic single forum with Socrates
+python main.py --classic
 ```
 
 ### Run Tests

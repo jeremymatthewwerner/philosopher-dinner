@@ -588,7 +588,8 @@ Would you like to include {info['name']} in your forum? You can say "yes add the
             "consciousness", "mind", "body", "soul", "free will", "determinism",
             "truth", "knowledge", "reality", "existence", "being", "metaphysics",
             "politics", "society", "government", "democracy", "freedom", "rights",
-            "meaning", "purpose", "life", "death", "happiness", "suffering"
+            "meaning", "purpose", "life", "death", "happiness", "suffering",
+            "dreams", "perception", "experience", "imagination", "memory", "thought"
         }
         
         text_lower = text.lower()

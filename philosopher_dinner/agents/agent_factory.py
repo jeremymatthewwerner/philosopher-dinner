@@ -9,12 +9,16 @@ from pathlib import Path
 
 from .base_agent import BaseAgent
 from .socrates import SocratesAgent
+from .socrates_llm import SocratesLLMAgent
+from .llm_agent import LLMAgent
 from ..forum.state import ForumState, Message, AgentMemory, AgentResponse, MessageType
+from ..config.llm_config import is_llm_available
 
 
-class DynamicPhilosopherAgent(BaseAgent):
+class DynamicPhilosopherAgent(LLMAgent):
     """
     Dynamically created philosopher agent based on historical template.
+    Uses LLM for authentic philosophical responses.
     """
     
     def __init__(
@@ -24,12 +28,23 @@ class DynamicPhilosopherAgent(BaseAgent):
     ):
         self.template = template
         
+        # Create enhanced persona description
+        persona_desc = template.get("persona_description", f"""
+        I am {template['name']}, a philosopher from {template['era']}. 
+        My philosophical approach is characterized by {template['style']}.
+        I am particularly interested in {', '.join(template['expertise'][:3])}.
+        """)
+        
         super().__init__(
             agent_id=agent_id,
             name=template["name"],
-            persona_description=template.get("persona_description", f"AI embodiment of {template['name']}"),
+            persona_description=persona_desc,
             expertise_areas=template["expertise"],
-            personality_traits=template["personality"]
+            personality_traits=template["personality"],
+            historical_context=template.get("background", f"I lived during {template['era']} and developed important ideas in {', '.join(template['expertise'][:2])}."),
+            philosophical_approach=template["style"],
+            famous_quotes=template.get("quotes", []),
+            key_concepts=template["key_ideas"]
         )
         
         # Additional template-specific attributes
@@ -313,10 +328,17 @@ class AgentFactory:
         self.templates_path = Path(templates_path) if templates_path else Path(__file__).parent / "templates"
         self.templates_path.mkdir(exist_ok=True)
         
-        # Registry of available agents
-        self.agent_registry: Dict[str, Type[BaseAgent]] = {
-            "socrates": SocratesAgent
-        }
+        # Registry of available agents - use LLM versions when available
+        if is_llm_available():
+            self.agent_registry: Dict[str, Type[BaseAgent]] = {
+                "socrates": SocratesLLMAgent
+            }
+            print("🤖 LLM is available - using AI-powered philosopher agents")
+        else:
+            self.agent_registry: Dict[str, Type[BaseAgent]] = {
+                "socrates": SocratesAgent
+            }
+            print("⚠️  LLM not available - using hardcoded philosopher responses")
         
         # Cache of created agents
         self.agent_cache: Dict[str, BaseAgent] = {}
