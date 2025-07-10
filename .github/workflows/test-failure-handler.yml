@@ -33,30 +33,11 @@ jobs:
         pip install -r requirements.txt
     
     - name: Download test artifacts
-      uses: actions/github-script@v6
+      uses: actions/download-artifact@v4
       with:
-        script: |
-          let allArtifacts = await github.rest.actions.listWorkflowRunArtifacts({
-             owner: context.repo.owner,
-             repo: context.repo.repo,
-             run_id: ${{ github.event.workflow_run.id }},
-          });
-          let matchArtifact = allArtifacts.data.artifacts.filter((artifact) => {
-            return artifact.name == "test-results"
-          })[0];
-          if (matchArtifact) {
-            let download = await github.rest.actions.downloadArtifact({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               artifact_id: matchArtifact.id,
-               archive_format: 'zip',
-            });
-            let fs = require('fs');
-            fs.writeFileSync('${{github.workspace}}/test-results.zip', Buffer.from(download.data));
-            
-            // Unzip the artifact
-            await exec.exec('unzip', ['test-results.zip']);
-          }
+        name: test-results
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        run-id: ${{ github.event.workflow_run.id }}
     
     - name: Analyze test failures
       id: analyze
