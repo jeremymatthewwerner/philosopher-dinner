@@ -9,16 +9,13 @@ from pathlib import Path
 
 from .base_agent import BaseAgent
 from .socrates import SocratesAgent
-from .socrates_llm import SocratesLLMAgent
-from .llm_agent import LLMAgent
 from ..forum.state import ForumState, Message, AgentMemory, AgentResponse, MessageType
-from ..config.llm_config import is_llm_available
 
 
-class DynamicPhilosopherAgent(LLMAgent):
+class DynamicPhilosopherAgent(BaseAgent):
     """
     Dynamically created philosopher agent based on historical template.
-    Uses LLM for authentic philosophical responses.
+    Automatically uses LLM when available through BaseAgent.
     """
     
     def __init__(
@@ -55,8 +52,8 @@ class DynamicPhilosopherAgent(LLMAgent):
         self.background = template.get("background", "")
         self.philosophical_method = template.get("method", "dialogue and reasoning")
     
-    def generate_response(self, state: ForumState) -> AgentResponse:
-        """Generate a response in the style of this philosopher"""
+    def _generate_fallback_response(self, state: ForumState) -> AgentResponse:
+        """Generate a fallback response when LLM is not available"""
         
         if not state["messages"]:
             return self._create_empty_response()
@@ -328,17 +325,12 @@ class AgentFactory:
         self.templates_path = Path(templates_path) if templates_path else Path(__file__).parent / "templates"
         self.templates_path.mkdir(exist_ok=True)
         
-        # Registry of available agents - use LLM versions when available
-        if is_llm_available():
-            self.agent_registry: Dict[str, Type[BaseAgent]] = {
-                "socrates": SocratesLLMAgent
-            }
-            print("🤖 LLM is available - using AI-powered philosopher agents")
-        else:
-            self.agent_registry: Dict[str, Type[BaseAgent]] = {
-                "socrates": SocratesAgent
-            }
-            print("⚠️  LLM not available - using hardcoded philosopher responses")
+        # Registry of available agents
+        self.agent_registry: Dict[str, Type[BaseAgent]] = {
+            "socrates": SocratesAgent
+        }
+        
+        # All agents now automatically use LLM when available through BaseAgent
         
         # Cache of created agents
         self.agent_cache: Dict[str, BaseAgent] = {}

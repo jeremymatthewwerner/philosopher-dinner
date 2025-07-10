@@ -166,11 +166,7 @@ Let me help you create the perfect forum for this discussion.
 
 **What specific question or theme would you like to explore?** 
 
-For example:
-- "What is the nature of justice in society?"
-- "How should we live a meaningful life?"
-- "What can we know for certain?"
-- "What is the relationship between mind and body?"
+{self._generate_topic_examples(topic_keywords)}
 
 The more specific you are, the better I can recommend the perfect thinkers for your discussion!"""
         else:
@@ -404,12 +400,24 @@ The thinkers are gathering and preparing their thoughts. You can now join the fo
                     score += 0.5
                     why_relevant.append("created foundational ethical frameworks")
             
-            if any(term in topic_lower for term in ["meaning", "purpose", "life", "existence", "happiness", "live"]):
+            # Use flexible pattern matching for happiness/meaning
+            happiness_patterns = ["happy", "happiness", "joy", "pleasure", "fulfillment", "meaning", "purpose", "life", "live"]
+            if any(pattern in topic_lower for pattern in happiness_patterns):
                 if thinker_id in ["aristotle", "confucius", "buddha", "nietzsche", "socrates"]:
                     score += 0.5
                     why_relevant.append("explored life's meaning and human flourishing")
             
-            if score > 0.3:
+            if any(term in topic_lower for term in ["reality", "truth", "illusion", "appearance", "real", "world"]):
+                if thinker_id in ["plato", "descartes", "kant", "hume"]:
+                    score += 0.5
+                    why_relevant.append("fundamental work on the nature of reality")
+            
+            if any(term in topic_lower for term in ["dreams", "sleep", "unconscious", "subconscious", "visions"]):
+                if thinker_id in ["descartes", "plato", "aristotle"]:
+                    score += 0.5
+                    why_relevant.append("explored the relationship between dreams and reality")
+            
+            if score > 0.2:  # Lower threshold to ensure we get suggestions
                 suggestion = ThinkerSuggestion(
                     name=info["name"],
                     era=info["era"],
@@ -421,6 +429,22 @@ The thinkers are gathering and preparing their thoughts. You can now join the fo
         
         # Sort by relevance score
         suggestions.sort(key=lambda x: x.confidence, reverse=True)
+        
+        # If no suggestions found, add some default philosophers
+        if not suggestions:
+            default_philosophers = ["aristotle", "socrates", "confucius", "buddha"]
+            for thinker_id in default_philosophers:
+                if thinker_id in self.available_thinkers:
+                    info = self.available_thinkers[thinker_id]
+                    suggestion = ThinkerSuggestion(
+                        name=info["name"],
+                        era=info["era"],
+                        expertise=info["expertise"],
+                        why_relevant="offers fundamental philosophical insights",
+                        confidence=0.3
+                    )
+                    suggestions.append(suggestion)
+        
         return suggestions[:8]  # Return top 8
     
     def _convert_name_to_id(self, name: str) -> str:
@@ -583,21 +607,103 @@ Would you like to include {info['name']} in your forum? You can say "yes add the
     
     def _extract_topic_keywords(self, text: str) -> List[str]:
         """Extract philosophical topic keywords from text"""
-        philosophical_terms = {
-            "ethics", "morality", "virtue", "justice", "good", "evil", "right", "wrong",
-            "consciousness", "mind", "body", "soul", "free will", "determinism",
-            "truth", "knowledge", "reality", "existence", "being", "metaphysics",
-            "politics", "society", "government", "democracy", "freedom", "rights",
-            "meaning", "purpose", "life", "death", "happiness", "suffering",
-            "dreams", "perception", "experience", "imagination", "memory", "thought"
+        # Map flexible terms to canonical concepts
+        term_patterns = {
+            "happiness": ["happy", "happiness", "joy", "pleasure", "fulfillment"],
+            "suffering": ["suffer", "suffering", "pain", "anguish", "misery"],
+            "ethics": ["ethics", "moral", "morality", "right", "wrong", "good", "evil"],
+            "virtue": ["virtue", "virtuous", "character", "excellence"],
+            "justice": ["justice", "just", "fair", "fairness", "unfair"],
+            "consciousness": ["consciousness", "conscious", "awareness", "mind", "mental"],
+            "freedom": ["freedom", "free", "liberty", "choice"],
+            "truth": ["truth", "true", "knowledge", "know", "certain"],
+            "reality": ["reality", "real", "existence", "exist", "being"],
+            "meaning": ["meaning", "purpose", "life", "live", "death", "die"],
+            "politics": ["politics", "political", "society", "government", "democracy"],
+            "dreams": ["dreams", "dream", "sleep", "unconscious"]
         }
         
         text_lower = text.lower()
-        found_terms = [term for term in philosophical_terms if term in text_lower]
+        found_terms = []
+        for concept, patterns in term_patterns.items():
+            if any(pattern in text_lower for pattern in patterns):
+                found_terms.append(concept)
         return found_terms[:5]  # Return up to 5 most relevant terms
     
-    def generate_response(self, state: ForumState) -> AgentResponse:
-        """Generate response for LangGraph compatibility"""
+    def _generate_topic_examples(self, topic_keywords: List[str]) -> str:
+        """Generate topic-specific examples based on detected keywords"""
+        examples_map = {
+            "happiness": [
+                "What is the relationship between pleasure and true happiness?",
+                "Can we be happy while suffering?", 
+                "Is happiness a feeling or a way of life?",
+                "Does pursuing happiness make us less happy?"
+            ],
+            "justice": [
+                "What makes a law just or unjust?",
+                "Should justice focus on punishment or rehabilitation?",
+                "Can there be justice without equality?",
+                "What is the relationship between justice and mercy?"
+            ],
+            "truth": [
+                "What can we know for certain?",
+                "Is truth relative or absolute?",
+                "Can we have knowledge without certainty?",
+                "What is the difference between truth and belief?"
+            ],
+            "reality": [
+                "What is the difference between appearance and reality?",
+                "Do we create our own reality?",
+                "What makes something real?",
+                "Is consciousness part of reality or separate from it?"
+            ],
+            "consciousness": [
+                "What is the relationship between mind and body?",
+                "Are we more than our thoughts?",
+                "Can machines be conscious?",
+                "What makes you 'you'?"
+            ],
+            "virtue": [
+                "What makes someone virtuous?",
+                "Can virtue be taught?",
+                "Is it better to be feared or loved?",
+                "What is the relationship between virtue and happiness?"
+            ],
+            "freedom": [
+                "Do we have free will?",
+                "What is the relationship between freedom and responsibility?",
+                "Can we be free in an unfree society?",
+                "Is freedom compatible with determinism?"
+            ],
+            "meaning": [
+                "How should we live a meaningful life?",
+                "What gives life purpose?",
+                "Can life have meaning without God?",
+                "Is the meaning of life something we discover or create?"
+            ]
+        }
+        
+        # Find relevant examples based on detected keywords
+        relevant_examples = []
+        for keyword in topic_keywords:
+            if keyword in examples_map:
+                relevant_examples.extend(examples_map[keyword][:2])  # Take 2 examples per keyword
+        
+        # If no specific examples found, use general ones
+        if not relevant_examples:
+            relevant_examples = [
+                "What is the nature of this concept?",
+                "How does this relate to how we should live?",
+                "What would the great thinkers say about this?",
+                "What assumptions are we making here?"
+            ]
+        
+        # Format as bullet points
+        formatted_examples = "\n".join([f"- \"{example}\"" for example in relevant_examples[:4]])
+        return f"For example:\n{formatted_examples}"
+    
+    def _generate_fallback_response(self, state: ForumState) -> AgentResponse:
+        """Generate fallback response when LLM is not available"""
         # This agent is primarily used outside of LangGraph for forum creation
         # But we implement this for interface compatibility
         

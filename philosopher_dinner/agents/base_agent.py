@@ -1,6 +1,7 @@
 """
 Base agent class for all philosopher agents.
 Defines the interface and common functionality.
+Now includes LLM integration for all agents.
 """
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
@@ -8,6 +9,7 @@ from datetime import datetime
 import uuid
 
 from ..forum.state import ForumState, Message, AgentMemory, AgentResponse, MessageType
+from ..config.llm_config import get_llm_instance, is_llm_available
 
 
 class BaseAgent(ABC):
@@ -20,12 +22,22 @@ class BaseAgent(ABC):
         persona_description: str,
         expertise_areas: List[str],
         personality_traits: Dict[str, float],
+        historical_context: str = "",
+        philosophical_approach: str = "",
+        famous_quotes: List[str] = None,
+        key_concepts: List[str] = None,
     ):
         self.agent_id = agent_id
         self.name = name
         self.persona_description = persona_description
         self.expertise_areas = expertise_areas
         self.personality_traits = personality_traits
+        
+        # Enhanced attributes for LLM prompting
+        self.historical_context = historical_context
+        self.philosophical_approach = philosophical_approach
+        self.famous_quotes = famous_quotes or []
+        self.key_concepts = key_concepts or []
         
         # Initialize memory
         self.memory = AgentMemory(
@@ -36,6 +48,13 @@ class BaseAgent(ABC):
             topic_interests={area: 0.8 for area in expertise_areas},
             last_active=datetime.now()
         )
+        
+        # Initialize LLM
+        self.llm = get_llm_instance()
+        self.llm_available = is_llm_available() and self.llm is not None
+        
+        # Create system prompt for LLM
+        self.system_prompt = self._create_system_prompt()
     
     def evaluate_activation(self, state: ForumState) -> float:
         """
@@ -113,11 +132,125 @@ class BaseAgent(ABC):
         
         return updated_state
     
-    @abstractmethod
+    def _create_system_prompt(self) -> str:
+        """Create a comprehensive system prompt for this philosopher"""
+        
+        personality_desc = ", ".join([f"{trait}: {value}" for trait, value in self.personality_traits.items()])
+        
+        prompt = f"""You are {self.name}, the renowned philosopher.
+
+HISTORICAL CONTEXT:
+{self.historical_context}
+
+PERSONA & APPROACH:
+{self.persona_description}
+
+PHILOSOPHICAL APPROACH:
+{self.philosophical_approach}
+
+KEY AREAS OF EXPERTISE:
+{', '.join(self.expertise_areas)}
+
+PERSONALITY TRAITS:
+{personality_desc}
+
+KEY CONCEPTS YOU DEVELOPED:
+{', '.join(self.key_concepts)}
+
+FAMOUS QUOTES:
+{chr(10).join(f"- {quote}" for quote in self.famous_quotes)}
+
+INSTRUCTIONS:
+1. Always respond authentically as {self.name} would, drawing from your historical knowledge and philosophical approach
+2. Use your characteristic style of reasoning and argumentation
+3. Reference your key concepts and ideas when relevant
+4. Engage thoughtfully with other participants' ideas
+5. Ask probing questions that reflect your philosophical method
+6. Keep responses conversational but substantive (2-4 sentences typically)
+7. Show genuine intellectual curiosity and respect for other thinkers
+8. Don't simply recite historical facts - engage as if you're alive and participating in real-time
+
+Remember: You are not just reciting historical information, but actively thinking and responding as this philosopher would in a living conversation."""
+
+        return prompt
+    
     def generate_response(self, state: ForumState) -> AgentResponse:
+        """Generate a response using LLM if available, otherwise use fallback"""
+        
+        if self.llm_available:
+            return self._generate_llm_response(state)
+        else:
+            return self._generate_fallback_response(state)
+    
+    def _generate_llm_response(self, state: ForumState) -> AgentResponse:
+        """Generate an authentic philosophical response using LLM"""
+        
+        try:
+            # Prepare conversation context
+            conversation_context = self._prepare_conversation_context(state)
+            
+            # Create the prompt
+            from langchain_core.messages import SystemMessage, HumanMessage
+            messages = [
+                SystemMessage(content=self.system_prompt),
+                HumanMessage(content=conversation_context)
+            ]
+            
+            # Generate response using LLM
+            response = self.llm.invoke(messages)
+            
+            # Extract thinking process
+            thinking = f"Considering this from my perspective as {self.name}, drawing on my expertise in {', '.join(self.expertise_areas[:2])}."
+            
+            # Create agent response
+            message = self.create_message(
+                content=response.content,
+                thinking=thinking
+            )
+            
+            return AgentResponse(
+                message=message,
+                updated_memory=self.memory,
+                activation_level=1.0,
+                should_continue=True,
+                metadata={"llm_generated": True, "model": self.llm.model_name if hasattr(self.llm, 'model_name') else "unknown"}
+            )
+            
+        except Exception as e:
+            print(f"Error generating LLM response for {self.name}: {e}")
+            return self._generate_fallback_response(state)
+    
+    def _prepare_conversation_context(self, state: ForumState) -> str:
+        """Prepare the conversation context for the LLM"""
+        
+        if not state["messages"]:
+            return f"This is the beginning of a new philosophical discussion. Please introduce yourself as {self.name} and share an opening thought that reflects your philosophical interests."
+        
+        # Get recent messages for context
+        recent_messages = state["messages"][-5:]  # Last 5 messages
+        
+        context = "Here is the recent conversation:\n\n"
+        
+        for msg in recent_messages:
+            sender = msg.get("sender", "Unknown")
+            content = msg.get("content", "")
+            context += f"{sender}: {content}\n\n"
+        
+        context += f"""Now please respond as {self.name}. Consider:
+- What aspects of this discussion align with your philosophical interests?
+- What questions would you naturally ask given your approach to philosophy?
+- How can you contribute meaningfully to advance the conversation?
+- What insights from your philosophical framework are relevant here?
+
+Respond authentically as {self.name} would."""
+
+        return context
+    
+    @abstractmethod
+    def _generate_fallback_response(self, state: ForumState) -> AgentResponse:
         """
-        Generate a response based on the current state.
-        This is where the agent's personality and expertise shine.
+        Generate a basic response when LLM is not available.
+        Must be implemented by each specific agent to provide fallback behavior.
         """
         pass
     
@@ -159,7 +292,15 @@ class BaseAgent(ABC):
         
         # Disagreeable agents jump into debates more
         agreeableness = self.personality_traits.get("agreeableness", 0.5)
-        if state["forum_config"]["mode"].value == "debate":
+        
+        # Handle different state structures gracefully
+        mode = None
+        if "forum_config" in state and "mode" in state["forum_config"]:
+            mode = state["forum_config"]["mode"]
+        elif "forum_mode" in state:
+            mode = state["forum_mode"] 
+        
+        if mode and (mode.value == "debate" if hasattr(mode, 'value') else mode == "debate"):
             return extroversion * 0.7 + (1 - agreeableness) * 0.3
         else:
             return extroversion * 0.8 + agreeableness * 0.2

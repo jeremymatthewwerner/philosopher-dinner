@@ -549,6 +549,21 @@ class TestIntegration(unittest.TestCase):
         
         forum = self.db.get_forum("lifecycle_test")
         self.assertIsNone(forum)
+    
+    def test_cli_instantiation(self):
+        """Test that CLI components can be instantiated without errors"""
+        from philosopher_dinner.cli.simple_forum_cli import SimpleForumManagerCLI
+        
+        # This should not throw any TypeError about abstract methods
+        try:
+            cli = SimpleForumManagerCLI()
+            self.assertIsNotNone(cli.forum_creator)
+            self.assertIsInstance(cli.forum_creator, ForumCreationAgent)
+        except TypeError as e:
+            if "abstract method" in str(e):
+                self.fail(f"CLI instantiation failed due to abstract method error: {e}")
+            else:
+                raise  # Re-raise if it's a different TypeError
 
 
 def run_comprehensive_tests():
