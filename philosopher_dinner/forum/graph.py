@@ -43,12 +43,15 @@ class PhilosopherForum:
         
         # Create all agents dynamically using the factory
         for participant_id in self.forum_config["participants"]:
-            if participant_id != "oracle":  # Skip oracle for now
-                agent = self.agent_factory.create_agent(participant_id)
-                if agent:
-                    self.agents[participant_id] = agent
-                else:
-                    print(f"Warning: Could not create agent for '{participant_id}'")
+            # Skip non-philosopher participants
+            if participant_id in ["oracle", "user", "human"]:
+                continue
+            
+            agent = self.agent_factory.create_agent(participant_id)
+            if agent:
+                self.agents[participant_id] = agent
+            else:
+                print(f"Warning: Could not create agent for '{participant_id}'")
         
         # Always ensure we have at least Socrates
         if "socrates" not in self.agents and "socrates" in self.forum_config["participants"]:
@@ -377,7 +380,7 @@ class PhilosopherForum:
             initial_state,
             config={
                 "configurable": {"thread_id": initial_state["session_id"]},
-                "recursion_limit": 5  # Limit recursion to prevent infinite loops
+                "recursion_limit": 25  # Reasonable limit for multi-agent conversations
             }
         )
         
@@ -393,7 +396,7 @@ class PhilosopherForum:
             state,
             config={
                 "configurable": {"thread_id": state["session_id"]},
-                "recursion_limit": 5  # Limit recursion to prevent infinite loops
+                "recursion_limit": 25  # Reasonable limit for multi-agent conversations
             }
         )
         

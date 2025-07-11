@@ -15,6 +15,7 @@ from test_dependencies import main as run_dependency_tests
 from test_cli_interactions import run_cli_tests
 from test_langgraph_flows import run_langgraph_tests 
 from test_agent_behavior import run_agent_tests
+from test_real_cli_execution import run_all_real_tests
 
 
 def run_integration_tests():
@@ -245,6 +246,17 @@ def main():
     
     # User scenario tests
     all_results.append(run_user_scenario_tests())
+    
+    # Real CLI execution tests
+    print("\n" + "=" * 60)
+    real_test_results = {"passed": 0, "failed": 0, "errors": []}
+    if run_all_real_tests():
+        real_test_results["passed"] = 4  # 4 real tests
+    else:
+        real_test_results["failed"] = 4
+        real_test_results["errors"].append("Real CLI execution failures")
+    all_results.append(real_test_results)
+    print("=" * 60)
     
     # Generate final report
     report = generate_test_report(all_results)

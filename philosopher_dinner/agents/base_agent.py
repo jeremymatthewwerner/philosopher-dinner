@@ -114,7 +114,10 @@ class BaseAgent(ABC):
         self._update_memory(state)
         
         # Decide if we should respond
-        if self.should_respond(state):
+        # Use the same threshold logic as _decide_next_speaker in graph.py
+        activation_threshold = 0.3 if len(state.get("participants", [])) > 2 else 0.6
+        
+        if self.should_respond(state, activation_threshold):
             # Generate response
             response = self.generate_response(state)
             
