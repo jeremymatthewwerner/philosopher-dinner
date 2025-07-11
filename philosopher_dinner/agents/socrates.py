@@ -31,10 +31,10 @@ class SocratesAgent(BaseAgent):
                 "courage", "wisdom", "self-knowledge", "questioning method"
             ],
             personality_traits={
-                "extroversion": 0.8,    # Very social, loves engaging with people
+                "extroversion": 0.75,   # Social, loves engaging with people
                 "agreeableness": 0.6,   # Friendly but willing to challenge
                 "openness": 0.9,        # Extremely open to new ideas and perspectives
-                "curiosity": 0.95,      # Insatiably curious about everything
+                "curiosity": 0.85,      # Very curious about everything
                 "humility": 0.9,        # Claims to know nothing
                 "persistence": 0.8,     # Keeps asking questions until reaching clarity
             },

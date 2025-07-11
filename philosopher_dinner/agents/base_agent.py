@@ -302,13 +302,21 @@ Respond authentically as {self.name} would."""
         provocative = self.personality_traits.get("provocative", 0.0)
         harmonious = self.personality_traits.get("harmonious", 0.0)
         analytical = self.personality_traits.get("analytical", 0.0)
+        scholarly = self.personality_traits.get("scholarly", 0.0)
+        wise = self.personality_traits.get("wise", 0.0)
+        teaching = self.personality_traits.get("teaching", 0.0)
+        curiosity = self.personality_traits.get("curiosity", 0.0)
         
         # Calculate sociability score based on available traits
         sociability = max(
             extroversion,
             provocative * 0.8,  # Provocative philosophers tend to speak up
-            harmonious * 0.6,   # Harmonious philosophers engage moderately
-            analytical * 0.5    # Analytical philosophers engage when relevant
+            harmonious * 0.7,   # Harmonious philosophers engage moderately
+            analytical * 0.6,   # Analytical philosophers engage when relevant
+            scholarly * 0.7,    # Scholarly philosophers like to contribute
+            wise * 0.7,         # Wise philosophers share insights
+            teaching * 0.8,     # Teaching philosophers love to engage
+            curiosity * 0.7     # Curious philosophers ask questions
         )
         
         # Get agreeableness or similar traits
