@@ -294,11 +294,31 @@ Respond authentically as {self.name} would."""
     
     def _calculate_personality_activation(self, state: ForumState) -> float:
         """Calculate activation based on personality traits and forum dynamics"""
-        # Extroverted agents speak more often
+        # Get sociability traits (different names for different philosophers)
         extroversion = self.personality_traits.get("extroversion", 0.5)
+        provocative = self.personality_traits.get("provocative", 0.0)
+        harmonious = self.personality_traits.get("harmonious", 0.0)
+        analytical = self.personality_traits.get("analytical", 0.0)
         
-        # Disagreeable agents jump into debates more
+        # Calculate sociability score based on available traits
+        sociability = max(
+            extroversion,
+            provocative * 0.8,  # Provocative philosophers tend to speak up
+            harmonious * 0.6,   # Harmonious philosophers engage moderately
+            analytical * 0.5    # Analytical philosophers engage when relevant
+        )
+        
+        # Get agreeableness or similar traits
         agreeableness = self.personality_traits.get("agreeableness", 0.5)
+        critical = self.personality_traits.get("critical", 0.0)
+        respectful = self.personality_traits.get("respectful", 0.0)
+        
+        # Calculate cooperation score
+        cooperation = max(
+            agreeableness,
+            respectful * 0.8,           # Respectful agents are agreeable
+            (1 - critical) * 0.6 if critical > 0 else 0.5  # Less critical = more agreeable
+        )
         
         # Handle different state structures gracefully
         mode = None
@@ -308,9 +328,9 @@ Respond authentically as {self.name} would."""
             mode = state["forum_mode"] 
         
         if mode and (mode.value == "debate" if hasattr(mode, 'value') else mode == "debate"):
-            return extroversion * 0.7 + (1 - agreeableness) * 0.3
+            return sociability * 0.7 + (1 - cooperation) * 0.3
         else:
-            return extroversion * 0.8 + agreeableness * 0.2
+            return sociability * 0.8 + cooperation * 0.2
     
     def _update_memory(self, state: ForumState) -> None:
         """Update agent's memory with new information from the conversation"""

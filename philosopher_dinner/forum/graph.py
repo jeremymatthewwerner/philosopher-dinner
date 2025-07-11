@@ -146,6 +146,9 @@ class PhilosopherForum:
         # Calculate who should speak next
         agent_scores = {}
         
+        # Use lower threshold for multi-agent conversations to encourage diversity
+        activation_threshold = 0.3 if len(self.agents) > 2 else 0.6
+        
         for agent_id, agent in self.agents.items():
             # Skip if agent spoke recently
             recent_messages = state["messages"][-2:] if len(state["messages"]) >= 2 else []
@@ -154,17 +157,77 @@ class PhilosopherForum:
                 
             # Calculate activation score
             activation = agent.evaluate_activation(state)
-            should_respond = agent.should_respond(state)
+            should_respond = agent.should_respond(state, activation_threshold)
             
             if should_respond:
                 agent_scores[agent_id] = activation
         
-        # Choose the most activated agent
+        # Choose the most activated agent with some variety for multi-agent conversations
         if agent_scores:
-            best_agent = max(agent_scores.keys(), key=lambda x: agent_scores[x])
-            return best_agent
+            if len(agent_scores) == 1:
+                # Only one agent wants to respond
+                return list(agent_scores.keys())[0]
+            else:
+                # Multiple agents want to respond - add some variety
+                # Check who spoke last to encourage turn-taking
+                last_speakers = []
+                for msg in reversed(state["messages"][-5:]):  # Last 5 messages
+                    if msg["message_type"] == MessageType.AGENT:
+                        last_speakers.append(msg["sender"])
+                
+                # For new conversations, add some variety by not always picking the highest scorer
+                if not last_speakers and len(agent_scores) > 1:
+                    # For brand new conversations, use weighted random selection
+                    import random
+                    
+                    # Sort agents by activation but add some randomness
+                    sorted_agents = sorted(agent_scores.items(), key=lambda x: x[1], reverse=True)
+                    
+                    # Give higher weight to top agents but allow others to speak too
+                    # Top agent gets 40% chance, second gets 30%, others split the rest
+                    if len(sorted_agents) >= 2:
+                        rand = random.random()
+                        if rand < 0.4:
+                            return sorted_agents[0][0]  # Highest activation
+                        elif rand < 0.7:
+                            return sorted_agents[1][0]  # Second highest
+                        else:
+                            # Random choice from the rest
+                            remaining = sorted_agents[2:] if len(sorted_agents) > 2 else [sorted_agents[0]]
+                            return random.choice(remaining)[0]
+                    else:
+                        return sorted_agents[0][0]
+                
+                # Prefer agents who haven't spoken recently
+                available_agents = [
+                    agent_id for agent_id in agent_scores.keys() 
+                    if agent_id not in last_speakers[:2]  # Not in last 2 speakers
+                ]
+                
+                if available_agents:
+                    # Choose best among agents who haven't spoken recently
+                    best_agent = max(available_agents, key=lambda x: agent_scores[x])
+                    return best_agent
+                else:
+                    # All agents spoke recently, choose the most activated
+                    best_agent = max(agent_scores.keys(), key=lambda x: agent_scores[x])
+                    return best_agent
         
-        # If no agent wants to speak, end conversation
+        # If no agent wants to speak with normal threshold, try with even lower threshold
+        if not agent_scores and len(self.agents) > 1:
+            for agent_id, agent in self.agents.items():
+                recent_messages = state["messages"][-2:] if len(state["messages"]) >= 2 else []
+                if any(msg["sender"] == agent_id for msg in recent_messages):
+                    continue
+                activation = agent.evaluate_activation(state)
+                if activation > 0.2:  # Very low threshold as fallback
+                    agent_scores[agent_id] = activation
+            
+            if agent_scores:
+                best_agent = max(agent_scores.keys(), key=lambda x: agent_scores[x])
+                return best_agent
+        
+        # If still no agent wants to speak, end conversation
         return "end"
     
     def _wait_for_human_input(self, state: ForumState) -> ForumState:
